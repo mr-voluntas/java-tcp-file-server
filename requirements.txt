@@ -1,0 +1,45 @@
+
+=== java-tcp-file-server requirements ===
+
+core functionality:
+
+client side:
+  - upload
+  - list
+  - delete
+  - status bar for upload and delete
+  - pretty print list of files. maybe a table
+  - command structure:
+    - upload 'filename'
+    - download 'filename' 
+    - list 'style' (full, simple, table) 
+
+server side:
+  - new client connection = new thread
+  - folder for each file type
+  - parse command from client
+  - process request, send back response
+  - server logs
+  - create directories for file types if not present
+
+
+additional functionality:
+  - basic auth
+  - only admin user can delete files
+  - create folders
+  - move files to different folders
+  - mutlithreaded uploads / downloads to make it faster
+
+
+design assumptions:
+  - strategy pattern, different processor classes for each file type?
+  - send file list as K:V map (file name: meta data (size, type, owner, upload date, total downloads)
+  - file object. thread safe array of file objects
+  - more advanced implementation of TCP. thread pools?
+  - look into 'NIO', non-blocking I/O
+
+
+
+
+
+
