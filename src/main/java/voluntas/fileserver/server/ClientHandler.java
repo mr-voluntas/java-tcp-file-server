@@ -1,15 +1,16 @@
 package voluntas.fileserver.server;
 
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.EOFException;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.OutputStream;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.logging.Logger;
-
-import voluntas.fileserver.Request;
-import voluntas.fileserver.RequestHandler;
 
 public class ClientHandler implements Runnable {
 
@@ -22,30 +23,75 @@ public class ClientHandler implements Runnable {
 
   @Override
   public void run() {
-    String fileDownloadDir = "./files-dir/";
+    String serverFilesDir = "./server-files/";
 
-    RequestHandler.makeDirectoryIfNotPresent(fileDownloadDir);
+    if (!Files.isDirectory(Paths.get(serverFilesDir))) {
+      try {
+        Files.createDirectory(Paths.get(serverFilesDir));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
 
-    try (InputStream clientIn = clientSocket.getInputStream();
-        OutputStream clientOut = clientSocket.getOutputStream();) {
+    try {
+      BufferedReader clientIn = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 
-      while (true) {
-        ObjectInputStream objectInputStream = new ObjectInputStream(clientIn);
-        Request requested = (Request) objectInputStream.readObject();
-        logger.info("Upload: " + requested.getFileName() + " : " + requested.getFileSize());
-
-        RequestHandler.writeInputStreamToFile(requested, fileDownloadDir,
-            clientIn);
-
+      String clientRequest;
+      while ((clientRequest = clientIn.readLine()) != null) {
+        System.out.println(clientRequest);
+        String[] request = clientRequest.split(" ");
+        String command = request[0];
+        String fileName = request[1];
+        switch (command) {
+          case "UPLOAD":
+            handleUpload(fileName, serverFilesDir, clientSocket);
+            break;
+          case "DOWNLOAD":
+            handleDownload(fileName, clientSocket);
+            break;
+          case "LIST":
+            handleList(clientSocket);
+            break;
+          default:
+            break;
+        }
       }
 
     } catch (EOFException e) {
-      e.printStackTrace();
+      throw new RuntimeException(e);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void handleUpload(String filename, String fileDir, Socket clientSocket) {
+    try (BufferedOutputStream fileOutputStream = new BufferedOutputStream(
+        new FileOutputStream(fileDir + filename));
+        BufferedReader clientIn = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+        PrintWriter clientOut = new PrintWriter(clientSocket.getOutputStream());) {
+
+      long fileSize = clientIn.read();
+      byte[] buffer = new byte[4096];
+      long totalBytesRead = 0;
+      int bytesRead;
+      while ((totalBytesRead <= fileSize) && (bytesRead = clientSocket.getInputStream().read(buffer)) != -1) {
+        fileOutputStream.write(buffer, 0, bytesRead);
+        totalBytesRead += bytesRead;
+      }
+      fileOutputStream.close();
+      System.out.println("upload");
+      clientOut.printf("File '%s' was successfully uploaded to server.", filename);
     } catch (IOException e) {
       e.printStackTrace();
-    } catch (ClassNotFoundException e) {
-      e.printStackTrace();
     }
+  }
+
+  private void handleDownload(String filename, Socket clientSocket) {
+    System.out.println("DOWNLOAD " + filename);
+  }
+
+  private void handleList(Socket clientSocket) {
+    System.out.println("LIST");
   }
 
 }
